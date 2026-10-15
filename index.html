@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PotholeGuard — Host URLs & Control Hub</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>" />
+  <!-- Leaflet CSS & JS for embedded map preview -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    :root {
+      --bg: #0b0f17;
+      --surface: #0f172a;
+      --card: #1e293b;
+      --border: #334155;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --cyan: #06b6d4;
+      --green: #22c55e;
+      --amber: #f59e0b;
+      --red: #ef4444;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.5;
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon {
+      font-size: 32px;
+    }
+
+    .brand h1 {
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--cyan);
+      letter-spacing: -0.5px;
+    }
+
+    .brand p {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .ping-btn {
+      background: var(--cyan);
+      color: #000;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: opacity 0.2s;
+    }
+
+    .ping-btn:hover { opacity: 0.9; }
+
+    /* Service Grid */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: transform 0.15s, border-color 0.15s;
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      border-color: var(--cyan);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .card-tag {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-weight: 600;
+      background: var(--card);
+      color: var(--cyan);
+    }
+
+    .card-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      flex: 1;
+    }
+
+    .card-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--cyan);
+      text-decoration: none;
+      background: var(--card);
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      word-break: break-all;
+    }
+
+    .card-link:hover {
+      background: #334155;
+    }
+
+    .status-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--amber);
+      margin-right: 6px;
+    }
+
+    .status-online { background: var(--green); }
+    .status-offline { background: var(--red); }
+
+    /* Map Section */
+    .section-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #map {
+      height: 420px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      margin-bottom: 32px;
+      overflow: hidden;
+    }
+
+    /* CLI & Commands */
+    .cli-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+
+    pre {
+      background: #020617;
+      padding: 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: #38bdf8;
+      overflow-x: auto;
+      margin-top: 8px;
+    }
+
+    footer {
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-muted);
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <span class="brand-icon">🛡️</span>
+        <div>
+          <h1>PotholeGuard Host URLs & Control Hub</h1>
+          <p>Local endpoints, live map telemetry, and authority services</p>
+        </div>
+      </div>
+      <button class="ping-btn" onclick="checkAllEndpoints()">
+        <span>⚡ Check Backend Health</span>
+      </button>
+    </header>
+
+    <!-- Host URLs Grid -->
+    <div class="grid">
+      <!-- 1. Dashboard -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Authority Dashboard</div>
+          <span class="card-tag">React + Vite</span>
+        </div>
+        <p class="card-desc">Interactive GIS road hazard map with clustering, severity heat-colors, work-order status transitions, and CSV exports.</p>
+        <a class="card-link" href="http://localhost:5173" target="_blank">
+          <span id="dot-dash" class="status-indicator"></span>http://localhost:5173 ↗
+        </a>
+      </div>
+
+      <!-- 2. FastAPI Docs -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Interactive API Docs</div>
+          <span class="card-tag">Swagger UI</span>
+        </div>
+        <p class="card-desc">Live OpenAPI documentation for testing all endpoints (/reports, /potholes/nearby, /alerts/route, /stats).</p>
+        <a class="card-link" href="http://localhost:8000/docs" target="_blank">
+          <span id="dot-docs" class="status-indicator"></span>http://localhost:8000/docs ↗
+        </a>
+      </div>
+
+      <!-- 3. Backend Root API -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">FastAPI Backend</div>
+          <span class="card-tag">Python 3.11</span>
+        </div>
+        <p class="card-desc">High-performance spatial clustering engine with PostGIS ST_DWithin 10m aggregation and confidence decay.</p>
+        <a class="card-link" href="http://localhost:8000" target="_blank">
+          <span id="dot-api" class="status-indicator"></span>http://localhost:8000 ↗
+        </a>
+      </div>
+
+      <!-- 4. Health Check -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Health Check</div>
+          <span class="card-tag">JSON Status</span>
+        </div>
+        <p class="card-desc">Real-time database connectivity and application status monitoring endpoint.</p>
+        <a class="card-link" href="http://localhost:8000/api/health" target="_blank">
+          <span id="dot-health" class="status-indicator"></span>http://localhost:8000/api/health ↗
+        </a>
+      </div>
+
+      <!-- 5. Mobile Emulator Host -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Android Emulator Host</div>
+          <span class="card-tag">Flutter Mobile</span>
+        </div>
+        <p class="card-desc">Android emulator loopback host addressing the local machine's FastAPI backend service.</p>
+        <div class="card-link">
+          <span>📱 http://10.0.2.2:8000/api</span>
+        </div>
+      </div>
+
+      <!-- 6. PostGIS Spatial DB -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">PostgreSQL + PostGIS</div>
+          <span class="card-tag">Port 5432</span>
+        </div>
+        <p class="card-desc">PostGIS 15 spatial database with GiST spatial indexing on Point(4326) road hazard geometries.</p>
+        <div class="card-link">
+          <span>🐘 localhost:5432 (potholeguard)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Map Preview -->
+    <div class="section-title">
+      <span>🗺️ Standalone Hazard Map Preview (OpenStreetMap)</span>
+    </div>
+    <div id="map"></div>
+
+    <!-- Quickstart Commands -->
+    <div class="cli-box">
+      <div class="section-title">🚀 Local Launch Commands</div>
+      <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 8px;">Run the entire stack locally with Docker Compose:</p>
+      <pre># 1. Start PostGIS, Backend, and Dashboard
+docker compose up --build
+
+# 2. Run Autonomous Drive Simulator to populate potholes
+python ml/simulate_drive.py --count 25
+
+# 3. Launch Flutter Mobile App
+cd mobile && flutter run</pre>
+    </div>
+
+    <footer>
+      PotholeGuard &bull; Autonomous Road-Hazard Detection & Safety System &bull; Open-Source &bull; OpenStreetMap
+    </footer>
+  </div>
+
+  <script>
+    // Initialize Standalone Leaflet Map Preview
+    const map = L.map('map').setView([37.7749, -122.4194], 14);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+      maxZoom: 19
+    }).addTo(map);
+
+    // Mock/Live sample potholes in San Francisco
+    const samplePotholes = [
+      { id: 101, lat: 37.7749, lon: -122.4194, sev: 4, count: 5, status: 'verified' },
+      { id: 102, lat: 37.7785, lon: -122.4150, sev: 5, count: 8, status: 'verified' },
+      { id: 103, lat: 37.7720, lon: -122.4250, sev: 2, count: 2, status: 'new' },
+      { id: 104, lat: 37.7810, lon: -122.4100, sev: 3, count: 4, status: 'assigned' },
+      { id: 105, lat: 37.7680, lon: -122.4200, sev: 1, count: 1, status: 'new' }
+    ];
+
+    const colors = { 1: '#22c55e', 2: '#84cc16', 3: '#f59e0b', 4: '#ef4444', 5: '#dc2626' };
+
+    samplePotholes.forEach(p => {
+      const circle = L.circleMarker([p.lat, p.lon], {
+        radius: 10,
+        fillColor: colors[p.sev],
+        color: '#ffffff',
+        weight: p.status === 'verified' ? 3 : 1.5,
+        opacity: 1,
+        fillOpacity: 0.85
+      }).addTo(map);
+
+      circle.bindPopup(`
+        <div style="font-family:sans-serif;color:#1e293b;">
+          <b>⚠️ Pothole #${p.id}</b><br/>
+          <b>Severity:</b> ${p.sev}/5<br/>
+          <b>Status:</b> ${p.status}<br/>
+          <b>Confirmations:</b> ${p.count}<br/>
+          <b>Coords:</b> ${p.lat.toFixed(4)}, ${p.lon.toFixed(4)}
+        </div>
+      `);
+    });
+
+    // Layer group for live backend hazard markers
+    const hazardLayer = L.layerGroup().addTo(map);
+
+    function renderHazardMarkers(hazards) {
+      hazardLayer.clearLayers();
+      hazards.forEach(p => {
+        const circle = L.circleMarker([p.latitude || p.lat, p.longitude || p.lon], {
+          radius: 10,
+          fillColor: colors[p.severity_max || p.sev] || '#ef4444',
+          color: '#ffffff',
+          weight: p.status === 'verified' ? 3 : 1.5,
+          opacity: 1,
+          fillOpacity: 0.85
+        });
+
+        circle.bindPopup(`
+          <div style="font-family:sans-serif;color:#1e293b;">
+            <b>⚠️ Pothole #${p.id}</b><br/>
+            <b>Severity:</b> ${p.severity_max || p.sev}/5<br/>
+            <b>Status:</b> ${p.status}<br/>
+            <b>Confirmations:</b> ${p.confirmation_count || p.count}<br/>
+            <b>Notes:</b> ${p.notes || 'Automated sensor report'}<br/>
+            <b>Coords:</b> ${(p.latitude || p.lat).toFixed(4)}, ${(p.longitude || p.lon).toFixed(4)}
+          </div>
+        `);
+        hazardLayer.addLayer(circle);
+      });
+      if (hazards.length > 0) {
+        const bounds = L.latLngBounds(hazards.map(p => [p.latitude || p.lat, p.longitude || p.lon]));
+        map.fitBounds(bounds, { padding: [25, 25], maxZoom: 15 });
+      }
+    }
+
+    // Initial render with samples
+    renderHazardMarkers(samplePotholes);
+
+    // Function to check if backend is reachable and fetch live database potholes
+    async function checkAllEndpoints() {
+      const btn = document.querySelector('.ping-btn');
+      btn.textContent = '⏳ Testing connection...';
+
+      try {
+        const res = await fetch('http://localhost:8000/api/health', { mode: 'cors' });
+        if (res.ok) {
+          const data = await res.json();
+          document.querySelectorAll('.status-indicator').forEach(el => {
+            el.className = 'status-indicator status-online';
+          });
+          btn.textContent = '✅ Backend Online (' + data.status + ')';
+
+          // Load live backend data
+          try {
+            const potRes = await fetch('http://localhost:8000/api/potholes?limit=200', { mode: 'cors' });
+            if (potRes.ok) {
+              const liveHazards = await potRes.json();
+              if (Array.isArray(liveHazards) && liveHazards.length > 0) {
+                renderHazardMarkers(liveHazards);
+                btn.textContent = `✅ Connected (${liveHazards.length} live hazards)`;
+              }
+            }
+          } catch(e) {}
+        } else {
+          throw new Error('Non-200 response');
+        }
+      } catch (err) {
+        document.querySelectorAll('.status-indicator').forEach(el => {
+          el.className = 'status-indicator status-offline';
+        });
+        btn.textContent = '❌ Backend Offline (Run py start.py)';
+      }
+    }
+
+    // Auto-check on page load
+    window.addEventListener('DOMContentLoaded', () => {
+      setTimeout(checkAllEndpoints, 600);
+    });
+  </script>
+</body>
+</html>

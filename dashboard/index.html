@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PotholeGuard — Authority Dashboard</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>" />
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+  <!-- React + Babel (no build step needed) -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #0b0f17; --surface: #0f172a; --card: #1e293b;
+      --border: #334155; --text: #f8fafc; --muted: #94a3b8;
+      --cyan: #06b6d4; --green: #22c55e; --amber: #f59e0b; --red: #ef4444;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    html,body,#root { height:100%; background:var(--bg); color:var(--text);
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+    #root { display:flex; flex-direction:column; }
+
+    .header { display:flex; align-items:center; gap:14px; padding:12px 20px;
+      background:var(--surface); border-bottom:1px solid var(--border); flex-wrap:wrap; }
+    .logo { font-size:18px; font-weight:900; color:var(--cyan); }
+    .sub  { font-size:11px; color:var(--muted); }
+    .stats-strip { display:flex; gap:10px; flex:1; justify-content:center; flex-wrap:wrap; }
+    .stat-pill { display:flex; flex-direction:column; align-items:center;
+      background:var(--card); border-radius:10px; padding:6px 14px; border:1px solid; }
+    .stat-pill .val { font-size:20px; font-weight:900; }
+    .stat-pill .lbl { font-size:10px; color:var(--muted); }
+    .header-right { display:flex; gap:8px; align-items:center; margin-left:auto; flex-wrap:wrap; }
+    .api-input { padding:7px 12px; border-radius:8px; border:1px solid var(--border);
+      background:var(--card); color:var(--text); font-size:12px; outline:none; width:190px; }
+    .refresh-btn { padding:7px 14px; border-radius:8px; border:none;
+      background:var(--cyan); color:#000; font-weight:700; font-size:13px; cursor:pointer; }
+    .refresh-btn:disabled { opacity:0.5; cursor:not-allowed; }
+
+    .toolbar { display:flex; align-items:center; gap:8px; padding:8px 20px;
+      background:var(--surface); border-bottom:1px solid var(--border); flex-wrap:wrap; }
+    .toggle-group { display:flex; gap:4px; }
+    .toggle-btn { padding:5px 14px; border-radius:8px; border:1px solid var(--border);
+      background:transparent; color:var(--muted); font-size:13px; cursor:pointer; }
+    .toggle-btn.active { background:var(--card); color:var(--cyan); border-color:var(--cyan); }
+    .filter-sel { padding:6px 10px; border-radius:8px; border:1px solid var(--border);
+      background:var(--card); color:var(--text); font-size:13px; cursor:pointer; }
+    .legend { display:flex; gap:5px; align-items:center; margin-left:6px; }
+    .legend-dot { width:22px; height:22px; border-radius:50%; display:inline-flex;
+      align-items:center; justify-content:center; color:#fff; font-size:11px; font-weight:700; }
+    .refresh-ts { color:#475569; font-size:11px; margin-left:auto; }
+
+    .err-banner { background:#7f1d1d; color:#fca5a5; padding:10px 20px; font-size:13px; font-weight:600; }
+
+    main { flex:1; overflow:hidden; padding:14px; display:flex; flex-direction:column; }
+    #map { flex:1; border-radius:12px; border:1px solid var(--border); }
+
+    /* Table */
+    .tbl-wrap { flex:1; overflow:auto; border-radius:10px; border:1px solid var(--border); }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    thead tr { background:var(--surface); position:sticky; top:0; z-index:2; }
+    th { padding:10px 12px; text-align:left; color:var(--muted); font-weight:600;
+      border-bottom:1px solid var(--border); cursor:pointer; user-select:none; }
+    td { padding:9px 12px; border-bottom:1px solid #1e293b; vertical-align:middle; }
+    .badge { display:inline-block; padding:2px 8px; border-radius:10px;
+      color:#fff; font-weight:700; font-size:11px; }
+    .tbl-controls { display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+    .srch-input { flex:2; min-width:200px; padding:8px 12px; border-radius:8px;
+      border:1px solid var(--border); background:var(--card); color:var(--text); font-size:13px; outline:none; }
+    .export-btn { padding:8px 16px; border-radius:8px; border:none;
+      background:var(--cyan); color:#000; font-weight:700; font-size:13px; cursor:pointer; }
+    .action-sel { padding:4px 8px; border-radius:6px; border:1px solid var(--border);
+      background:#0f172a; color:var(--text); font-size:12px; cursor:pointer; }
+
+    /* Leaflet popup */
+    .leaflet-popup-content { font-family:-apple-system,sans-serif; color:#1e293b; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useCallback, useRef, useMemo } = React;
+
+// ── Config & Helpers ──────────────────────────────────────────────────────────
+function getApiBase() {
+  const custom = localStorage.getItem('PG_API_URL');
+  if (custom && custom.trim()) return custom.trim().replace(/\/+$/, '');
+  if (typeof window !== 'undefined' && window.VITE_API_BASE_URL) {
+    return window.VITE_API_BASE_URL.trim().replace(/\/+$/, '');
+  }
+  return 'http://localhost:8000/api';
+}
+
+const SEV_COLORS = { 1:'#22c55e',2:'#84cc16',3:'#f59e0b',4:'#ef4444',5:'#dc2626' };
+const STA_COLORS = { new:'#64748b',verified:'#0ea5e9',assigned:'#f59e0b',fixed:'#22c55e',possibly_fixed:'#a78bfa' };
+
+// ── API helpers ────────────────────────────────────────────────────────────────
+async function apiFetch(path, opts={}, baseOverride=null) {
+  const base = baseOverride || getApiBase();
+  const res = await fetch(`${base}${path}`, {
+    headers:{'Content-Type':'application/json',...(opts.headers||{})},
+    ...opts
+  });
+  if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+  return res.json();
+}
+const fetchPotholes = (base, params={}) => {
+  const q = new URLSearchParams({limit:500,...params});
+  return apiFetch(`/potholes?${q}`, {}, base);
+};
+const fetchStats = (base) => apiFetch('/stats', {}, base);
+const patchStatus = (id, status, notes, key, base) =>
+  apiFetch(`/potholes/${id}/status`, {
+    method:'PATCH', headers:{'X-API-Key':key},
+    body: JSON.stringify({status, notes})
+  }, base);
+const createTestReport = (lat, lon, sev, base) =>
+  apiFetch('/reports', {
+    method: 'POST',
+    body: JSON.stringify({
+      device_id: 'browser-test-' + Math.floor(Math.random() * 10000),
+      latitude: lat,
+      longitude: lon,
+      speed: 12.0,
+      accuracy: 3.0,
+      severity: sev,
+      timestamp: new Date().toISOString()
+    })
+  }, base);
+
+// ── MapView (Leaflet, no React-Leaflet) ───────────────────────────────────────
+function MapView({ potholes, apiKey, apiUrl, onRefresh, filters }) {
+  const containerRef = useRef(null);
+  const mapRef = useRef(null);
+  const clusterRef = useRef(null);
+
+  useEffect(() => {
+    if (mapRef.current) return;
+    mapRef.current = L.map(containerRef.current, { center:[37.7749,-122.4194], zoom:13 });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom:19
+    }).addTo(mapRef.current);
+    clusterRef.current = L.markerClusterGroup({ chunkedLoading:true });
+    mapRef.current.addLayer(clusterRef.current);
+    return () => { if(mapRef.current){ mapRef.current.remove(); mapRef.current=null; } };
+  }, []);
+
+  useEffect(() => {
+    if (!mapRef.current || !clusterRef.current) return;
+    clusterRef.current.clearLayers();
+
+    const filtered = potholes.filter(p => {
+      if (filters.status && p.status !== filters.status) return false;
+      if (filters.sev && p.severity_max < +filters.sev) return false;
+      return true;
+    });
+
+    filtered.forEach(p => {
+      const col = SEV_COLORS[p.severity_max] || '#64748b';
+      const sz  = p.status==='verified' ? 28 : 24;
+      const ico = L.divIcon({
+        className:'',
+        html:`<div style="width:${sz}px;height:${sz}px;background:${col};border-radius:50%;
+          border:${p.status==='verified'?'2.5px solid #fff':'1.5px solid rgba(255,255,255,.5)'};
+          display:flex;align-items:center;justify-content:center;
+          color:#fff;font-weight:bold;font-size:${sz>24?13:11}px;
+          box-shadow:0 0 8px ${col}88;">${p.severity_max}</div>`,
+        iconSize:[sz,sz], iconAnchor:[sz/2,sz/2]
+      });
+      const marker = L.marker([p.latitude,p.longitude],{icon:ico});
+      const popup = document.createElement('div');
+      const statuses = ['new','verified','assigned','fixed'].filter(s=>s!==p.status);
+      const btns = apiKey ? statuses.map(s=>
+        `<button data-s="${s}" style="background:${STA_COLORS[s]};color:#fff;border:none;
+         border-radius:5px;padding:4px 9px;font-size:11px;cursor:pointer;
+         margin-right:4px;margin-top:4px;font-weight:600;">${s}</button>`
+      ).join('') : '';
+      popup.innerHTML = `
+        <div style="min-width:210px;font-size:13px;">
+          <b>⚠ Pothole #${p.id}</b><br/>
+          <span style="background:${col};color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">
+            Severity ${p.severity_max}/5</span>
+          <span style="background:${STA_COLORS[p.status]||'#64748b'};color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;margin-left:4px;">
+            ${p.status}</span>
+          <table style="margin-top:6px;width:100%;font-size:12px;border-collapse:collapse;">
+            <tr><td style="color:#64748b;">Avg sev</td><td><b>${p.severity_avg?.toFixed(1)}</b></td></tr>
+            <tr><td style="color:#64748b;">Reports</td><td><b>${p.confirmation_count}</b></td></tr>
+            <tr><td style="color:#64748b;">First seen</td><td>${new Date(p.first_detected_at).toLocaleDateString()}</td></tr>
+            <tr><td style="color:#64748b;">Last seen</td><td>${new Date(p.last_detected_at).toLocaleDateString()}</td></tr>
+            <tr><td style="color:#64748b;">Coords</td><td>${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)}</td></tr>
+          </table>
+          ${apiKey?`<div style="margin-top:8px;font-size:11px;color:#64748b;font-weight:600;">Change status:</div><div>${btns}</div>`:''}
+        </div>`;
+      popup.querySelectorAll('button[data-s]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          try {
+            await patchStatus(p.id, btn.dataset.s, null, apiKey, apiUrl);
+            onRefresh();
+            marker.closePopup();
+          } catch(e) { alert('Update failed: '+e.message); }
+        });
+      });
+      marker.bindPopup(popup);
+      clusterRef.current.addLayer(marker);
+    });
+
+    if (filtered.length > 0) {
+      const bounds = L.latLngBounds(filtered.map(p=>[p.latitude,p.longitude]));
+      mapRef.current.fitBounds(bounds, {padding:[30,30], maxZoom:16});
+    }
+  }, [potholes, apiKey, apiUrl, filters, onRefresh]);
+
+  return <div ref={containerRef} id="map" />;
+}
+
+// ── ReportTable ────────────────────────────────────────────────────────────────
+function ReportTable({ potholes, apiKey, apiUrl, onRefresh }) {
+  const [search,   setSearch]   = useState('');
+  const [sortF,    setSortF]    = useState('severity_max');
+  const [sortAsc,  setSortAsc]  = useState(false);
+  const [sta,      setSta]      = useState('');
+  const [sevF,     setSevF]     = useState('');
+  const [updating, setUpdating] = useState(null);
+
+  const rows = useMemo(() => {
+    let r = potholes;
+    if (search) { const q=search.toLowerCase(); r=r.filter(p=>String(p.id).includes(q)||p.status.includes(q)||String(p.latitude).includes(q)||String(p.longitude).includes(q)); }
+    if (sta) r=r.filter(p=>p.status===sta);
+    if (sevF) r=r.filter(p=>p.severity_max>=+sevF);
+    return [...r].sort((a,b)=>{ const av=a[sortF],bv=b[sortF]; return sortAsc?(av>bv?1:-1):(av<bv?1:-1); });
+  }, [potholes,search,sortF,sortAsc,sta,sevF]);
+
+  const sortBy = f => { if(sortF===f) setSortAsc(!sortAsc); else { setSortF(f); setSortAsc(false); } };
+  const Th = ({f,l}) => <th onClick={()=>sortBy(f)}>{l}{sortF===f?(sortAsc?' ↑':' ↓'):''}</th>;
+
+  function exportCsv() {
+    const h = 'id,latitude,longitude,severity_max,severity_avg,confirmation_count,status,first_detected_at,last_detected_at\n';
+    const b = rows.map(p=>[p.id,p.latitude,p.longitude,p.severity_max,p.severity_avg?.toFixed(2),p.confirmation_count,p.status,p.first_detected_at,p.last_detected_at].join(',')).join('\n');
+    const a = Object.assign(document.createElement('a'),{href:URL.createObjectURL(new Blob([h+b],{type:'text/csv'})),download:`potholes_${new Date().toISOString().slice(0,10)}.csv`});
+    a.click();
+  }
+
+  async function changeStatus(id, newS) {
+    if (!apiKey) return alert('Enter authority API key first.');
+    setUpdating(id);
+    try { await patchStatus(id, newS, null, apiKey, apiUrl); onRefresh(); }
+    catch(e) { alert('Update failed: '+e.message); }
+    finally { setUpdating(null); }
+  }
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',height:'100%',gap:10}}>
+      <div className="tbl-controls">
+        <input className="srch-input" placeholder="🔍  Search by ID, status, coordinates…" value={search} onChange={e=>setSearch(e.target.value)} />
+        <select className="filter-sel" value={sta} onChange={e=>setSta(e.target.value)}>
+          <option value="">All Statuses</option>
+          {['new','verified','assigned','fixed','possibly_fixed'].map(s=><option key={s} value={s}>{s}</option>)}
+        </select>
+        <select className="filter-sel" value={sevF} onChange={e=>setSevF(e.target.value)}>
+          <option value="">All Severities</option>
+          {[1,2,3,4,5].map(n=><option key={n} value={n}>≥ {n}</option>)}
+        </select>
+        <button className="export-btn" onClick={exportCsv}>⬇ CSV ({rows.length})</button>
+      </div>
+      <div className="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <Th f="id" l="#ID" /><Th f="severity_max" l="Severity" /><Th f="confirmation_count" l="Reports" />
+              <Th f="status" l="Status" /><Th f="latitude" l="Latitude" /><Th f="longitude" l="Longitude" />
+              <Th f="last_detected_at" l="Last Seen" /><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length===0 ? (
+              <tr><td colSpan={8} style={{textAlign:'center',padding:24,color:'#64748b'}}>No hazards match current filters.</td></tr>
+            ) : rows.map(p=>(
+              <tr key={p.id}>
+                <td><b style={{color:'#94a3b8'}}>#{p.id}</b></td>
+                <td><span className="badge" style={{background:SEV_COLORS[p.severity_max]}}>{p.severity_max}/5</span></td>
+                <td style={{textAlign:'center'}}>{p.confirmation_count}</td>
+                <td><span className="badge" style={{background:STA_COLORS[p.status]||'#64748b'}}>{p.status}</span></td>
+                <td style={{fontFamily:'monospace',fontSize:12,color:'#94a3b8'}}>{p.latitude.toFixed(5)}</td>
+                <td style={{fontFamily:'monospace',fontSize:12,color:'#94a3b8'}}>{p.longitude.toFixed(5)}</td>
+                <td>{new Date(p.last_detected_at).toLocaleDateString()}</td>
+                <td>
+                  {updating===p.id ? <span style={{color:'#94a3b8',fontSize:12}}>Updating…</span>
+                  : <select className="action-sel" value={p.status} onChange={e=>changeStatus(p.id,e.target.value)}>
+                      {['new','verified','assigned','fixed'].map(s=><option key={s} value={s}>{s}</option>)}
+                    </select>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── StatsStrip ────────────────────────────────────────────────────────────────
+function StatPill({ label, value, color }) {
+  return (
+    <div className="stat-pill" style={{borderColor:color}}>
+      <span className="val" style={{color}}>{value}</span>
+      <span className="lbl">{label}</span>
+    </div>
+  );
+}
+
+// ── App ───────────────────────────────────────────────────────────────────────
+function App() {
+  const [apiUrl,   setApiUrl]   = useState(getApiBase);
+  const [potholes, setPotholes] = useState([]);
+  const [stats,    setStats]    = useState(null);
+  const [loading,  setLoading]  = useState(true);
+  const [error,    setError]    = useState(null);
+  const [view,     setView]     = useState('map');
+  const [apiKey,   setApiKey]   = useState('');
+  const [filters,  setFilters]  = useState({status:'',sev:''});
+  const [ts,       setTs]       = useState(null);
+  const [adding,   setAdding]   = useState(false);
+
+  const loadData = useCallback(async (overrideUrl) => {
+    const url = overrideUrl || apiUrl;
+    setLoading(true); setError(null);
+    try {
+      const [ph, st] = await Promise.all([fetchPotholes(url), fetchStats(url)]);
+      setPotholes(ph); setStats(st); setTs(new Date());
+    } catch(e) { setError(e.message); }
+    finally { setLoading(false); }
+  }, [apiUrl]);
+
+  useEffect(() => {
+    loadData();
+    const id = setInterval(() => loadData(), 15000);
+    return () => clearInterval(id);
+  }, [loadData]);
+
+  async function handleAddTestHazard() {
+    setAdding(true);
+    try {
+      const testLat = 37.774 + (Math.random() - 0.5) * 0.03;
+      const testLon = -122.419 + (Math.random() - 0.5) * 0.03;
+      const sev = Math.floor(Math.random() * 4) + 2;
+      await createTestReport(testLat, testLon, sev, apiUrl);
+      await loadData(apiUrl);
+    } catch(err) {
+      alert('Could not submit report: ' + err.message);
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  return (
+    <>
+      {/* Header */}
+      <div className="header">
+        <div>
+          <div className="logo">🛡️ PotholeGuard</div>
+          <div className="sub">Authority Dashboard</div>
+        </div>
+        {stats && (
+          <div className="stats-strip">
+            <StatPill label="Total"    value={stats.total_potholes}    color="#64748b" />
+            <StatPill label="Verified" value={stats.verified_count}    color="#0ea5e9" />
+            <StatPill label="Fixed"    value={stats.fixed_count}       color="#22c55e" />
+            <StatPill label="⚠ High"   value={stats.high_severity_count} color="#ef4444" />
+          </div>
+        )}
+        <div className="header-right">
+          {/* Connection status indicator */}
+          <div style={{
+            display:'inline-flex', alignItems:'center', gap:6, padding:'6px 12px',
+            borderRadius:8, fontSize:12, fontWeight:700,
+            background: error ? '#450a0a' : '#064e3b',
+            border: `1px solid ${error ? '#7f1d1d' : '#059669'}`,
+            color: error ? '#fca5a5' : '#34d399'
+          }}>
+            <span style={{
+              width:8, height:8, borderRadius:'50%',
+              background: error ? '#ef4444' : '#10b981'
+            }}></span>
+            {error ? 'Backend Offline' : `Connected (${potholes.length} hazards)`}
+          </div>
+
+          {/* Backend URL Input */}
+          <input className="api-input" style={{width:185}} placeholder="🌐 Backend API URL"
+            value={apiUrl}
+            onChange={e => {
+              setApiUrl(e.target.value);
+              localStorage.setItem('PG_API_URL', e.target.value);
+            }}
+            onBlur={() => loadData(apiUrl)}
+            title="Backend API URL (e.g. http://localhost:8000/api)"
+          />
+
+          <input className="api-input" type="password" placeholder="🔑 Authority API Key"
+            value={apiKey} onChange={e=>setApiKey(e.target.value)} />
+
+          <button className="refresh-btn" onClick={() => loadData(apiUrl)} disabled={loading}>
+            {loading ? '⏳' : '↻'} Refresh
+          </button>
+
+          <button className="refresh-btn" style={{background:'#f59e0b', color:'#000'}}
+            onClick={handleAddTestHazard} disabled={adding || loading}
+            title="Submit a test hazard from frontend to backend">
+            {adding ? '⏳ Adding...' : '⚡ Add Test Pothole'}
+          </button>
+        </div>
+      </div>
+
+      {/* Toolbar */}
+      <div className="toolbar">
+        <div className="toggle-group">
+          <button className={`toggle-btn${view==='map'?' active':''}`} onClick={()=>setView('map')}>🗺 Map</button>
+          <button className={`toggle-btn${view==='table'?' active':''}`} onClick={()=>setView('table')}>📋 Table</button>
+        </div>
+        <select className="filter-sel" value={filters.sev} onChange={e=>setFilters(f=>({...f,sev:e.target.value}))}>
+          <option value="">All Severities</option>
+          {[1,2,3,4,5].map(n=><option key={n} value={n}>≥ Severity {n}</option>)}
+        </select>
+        <select className="filter-sel" value={filters.status} onChange={e=>setFilters(f=>({...f,status:e.target.value}))}>
+          <option value="">All Statuses</option>
+          {['new','verified','assigned','fixed','possibly_fixed'].map(s=><option key={s} value={s}>{s}</option>)}
+        </select>
+        <div className="legend">
+          {Object.entries(SEV_COLORS).map(([s,c])=>(
+            <span key={s} className="legend-dot" style={{background:c}}>{s}</span>
+          ))}
+        </div>
+        {ts && <span className="refresh-ts">Updated {ts.toLocaleTimeString()}</span>}
+      </div>
+
+      {/* Error Banner */}
+      {error && (
+        <div className="err-banner" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+          <span>⚠ Cannot reach backend at <code>{apiUrl}</code> ({error})</span>
+          <button onClick={() => {
+            setApiUrl('http://localhost:8000/api');
+            localStorage.setItem('PG_API_URL', 'http://localhost:8000/api');
+            loadData('http://localhost:8000/api');
+          }} style={{background:'#991b1b', border:'1px solid #fca5a5', color:'#fff', padding:'3px 10px', borderRadius:6, cursor:'pointer', fontSize:12, fontWeight:600}}>
+            Reset to http://localhost:8000/api
+          </button>
+        </div>
+      )}
+
+      {/* Main */}
+      <main>
+        {view==='map'
+          ? <MapView potholes={potholes} apiKey={apiKey} apiUrl={apiUrl} onRefresh={() => loadData(apiUrl)} filters={filters} />
+          : <ReportTable potholes={potholes} apiKey={apiKey} apiUrl={apiUrl} onRefresh={() => loadData(apiUrl)} />}
+      </main>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgis/postgis:15-3.3-alpine
+    container_name: potholeguard-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-potholeguard}
+      POSTGRES_USER: ${POSTGRES_USER:-potholeguard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-potholeguard_secret}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-potholeguard} -d ${POSTGRES_DB:-potholeguard}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: potholeguard-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-potholeguard}:${POSTGRES_PASSWORD:-potholeguard_secret}@db:5432/${POSTGRES_DB:-potholeguard}
+      AUTHORITY_API_KEY: ${AUTHORITY_API_KEY:-potholeguard_admin_key_2026}
+      APP_ENV: production
+      PORT: 8000
+      MUNICIPAL_WEBHOOK_URL: ${MUNICIPAL_WEBHOOK_URL:-}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  dashboard:
+    image: node:20-alpine
+    container_name: potholeguard-dashboard
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - ./dashboard:/app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000/api
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
