@@ -25,10 +25,20 @@ class PointLocation(TypeDecorator):
     impl = Text
     cache_ok = True
 
+    # Spatial metadata required by GeoAlchemy2 DDL and reflection hooks
+    spatial_index = True
+    use_typmod = True
+    use_N_D_index = False
+    srid = 4326
+    geometry_type = "POINT"
+    dimension = 2
+
     def load_dialect_impl(self, dialect):
-        if dialect.name == "postgresql":
+        if dialect is not None and getattr(dialect, "name", None) == "postgresql":
             return dialect.type_descriptor(Geometry(geometry_type="POINT", srid=4326, spatial_index=True))
-        return dialect.type_descriptor(Text())
+        if dialect is not None:
+            return dialect.type_descriptor(Text())
+        return Text()
 
     def process_bind_param(self, value, dialect):
         if value is None:

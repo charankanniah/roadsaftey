@@ -51,6 +51,8 @@ def get_db():
 
 def init_db():
     """Initialize database tables and spatial extensions if running on PostgreSQL."""
+    import app.models  # noqa: F401 - ensure all ORM tables are registered on Base.metadata
+
     if "postgres" in db_url:
         try:
             with engine.connect() as conn:
