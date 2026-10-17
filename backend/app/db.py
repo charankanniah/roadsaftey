@@ -12,6 +12,13 @@ connect_args = {}
 db_url = settings.DATABASE_URL
 engine_kwargs = {"pool_pre_ping": True}
 
+# Render, Heroku, and Supabase often provide postgres:// or postgresql:// URLs.
+# SQLAlchemy 2+ requires the explicit dialect prefix postgresql+psycopg2://
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql+psycopg2://", 1)
+elif db_url.startswith("postgresql://") and not db_url.startswith("postgresql+"):
+    db_url = db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+
 if "postgres" in db_url:
     try:
         import psycopg2  # noqa: F401

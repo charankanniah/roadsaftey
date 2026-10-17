@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import MapView from './components/MapView.jsx'
 import ReportTable from './components/ReportTable.jsx'
-import { fetchPotholes, fetchStats } from './api.js'
+import { fetchPotholes, fetchStats, getApiBase, setApiBase } from './api.js'
 
 const SEVERITY_COLORS = {
   1: '#22c55e', 2: '#84cc16', 3: '#f59e0b', 4: '#ef4444', 5: '#dc2626',
@@ -16,6 +16,28 @@ export default function App() {
   const [apiKey, setApiKey] = useState('')
   const [filters, setFilters] = useState({ status: '', severityMin: '' })
   const [lastRefresh, setLastRefresh] = useState(null)
+  const [currentApi, setCurrentApi] = useState(() => getApiBase())
+  const [apiUrlInput, setApiUrlInput] = useState(() => getApiBase())
+  const [showApiSettings, setShowApiSettings] = useState(false)
+
+  const handleSaveApiUrl = () => {
+    if (apiUrlInput && apiUrlInput.trim()) {
+      setApiBase(apiUrlInput.trim())
+      const updated = getApiBase()
+      setCurrentApi(updated)
+      setShowApiSettings(false)
+      loadData()
+    }
+  }
+
+  const handleResetApiUrl = () => {
+    setApiBase(null)
+    const updated = getApiBase()
+    setCurrentApi(updated)
+    setApiUrlInput(updated)
+    setShowApiSettings(false)
+    loadData()
+  }
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -57,8 +79,15 @@ export default function App() {
           </div>
         )}
 
-        {/* Authority API Key input */}
+        {/* Authority API Key & Backend Settings */}
         <div style={s.headerRight}>
+          <button
+            style={s.apiBadgeBtn}
+            onClick={() => setShowApiSettings((prev) => !prev)}
+            title="Configure Backend API URL"
+          >
+            ⚙️ {currentApi.replace(/\/api\/?$/, '').replace(/^https?:\/\//, '') || 'API URL'}
+          </button>
           <input
             style={s.apiKeyInput}
             placeholder="🔑 Authority API Key"
@@ -71,6 +100,23 @@ export default function App() {
           </button>
         </div>
       </header>
+
+      {/* Backend API Settings Bar (expandable) */}
+      {showApiSettings && (
+        <div style={s.apiSettingsPanel}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#38bdf8' }}>Backend API URL:</span>
+          <input
+            type="text"
+            style={s.apiSettingsInput}
+            value={apiUrlInput}
+            onChange={(e) => setApiUrlInput(e.target.value)}
+            placeholder="e.g. https://potholeguard-backend.onrender.com/api"
+          />
+          <button style={s.apiConnectBtn} onClick={handleSaveApiUrl}>Save & Connect</button>
+          <button style={s.apiResetBtn} onClick={handleResetApiUrl}>Reset to Default</button>
+          <button style={s.apiCloseBtn} onClick={() => setShowApiSettings(false)}>✕</button>
+        </div>
+      )}
 
       {/* Filter bar */}
       <div style={s.filterBar}>
@@ -124,10 +170,32 @@ export default function App() {
         </span>
       </div>
 
-      {/* Error banner */}
+      {/* Error banner with inline API URL fixer */}
       {error && (
         <div style={s.errorBanner}>
-          ⚠ Cannot reach backend: {error} — Is docker compose running?
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+            <span>⚠ <strong>Cannot reach backend:</strong> {error}</span>
+            <span style={{ fontSize: 12, opacity: 0.9 }}>Active Target: <code>{currentApi}</code></span>
+          </div>
+          <div style={s.errorConfigRow}>
+            <span style={{ fontSize: 12, color: '#fecaca', whiteSpace: 'nowrap' }}>Change Backend URL:</span>
+            <input
+              type="text"
+              style={s.apiSettingsInput}
+              value={apiUrlInput}
+              onChange={(e) => setApiUrlInput(e.target.value)}
+              placeholder="https://your-backend.onrender.com/api"
+            />
+            <button style={s.apiConnectBtn} onClick={handleSaveApiUrl}>
+              Connect
+            </button>
+            <button style={s.apiResetBtn} onClick={handleResetApiUrl}>
+              Reset
+            </button>
+          </div>
+          <div style={{ fontSize: 11, color: '#fecaca', opacity: 0.85, marginTop: 4 }}>
+            💡 <em>For permanent production setup:</em> In Vercel Project Settings &rarr; Environment Variables, add <code>VITE_API_BASE_URL</code> with your deployed backend URL (e.g. <code>https://potholeguard-backend.onrender.com/api</code>) and redeploy.
+          </div>
         </div>
       )}
 
@@ -210,8 +278,36 @@ const s = {
   },
   refreshTime: { color: '#475569', fontSize: 11, marginLeft: 'auto' },
   errorBanner: {
-    background: '#7f1d1d', color: '#fca5a5', padding: '10px 20px',
+    background: '#7f1d1d', color: '#fca5a5', padding: '12px 20px',
     fontSize: 13, fontWeight: 600,
+  },
+  apiBadgeBtn: {
+    padding: '6px 12px', borderRadius: 8, border: '1px solid #334155',
+    background: '#1e293b', color: '#38bdf8', fontSize: 12, fontWeight: 600,
+    cursor: 'pointer', maxWidth: 170, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+  },
+  apiSettingsPanel: {
+    display: 'flex', alignItems: 'center', gap: 10, padding: '8px 20px',
+    background: '#0c1322', borderBottom: '1px solid #0284c7', flexWrap: 'wrap',
+  },
+  apiSettingsInput: {
+    padding: '6px 12px', borderRadius: 6, border: '1px solid #334155',
+    background: '#1e293b', color: '#e2e8f0', fontSize: 13, outline: 'none', flex: 1, minWidth: 260,
+  },
+  apiConnectBtn: {
+    padding: '6px 14px', borderRadius: 6, border: 'none',
+    background: '#0284c7', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+  },
+  apiResetBtn: {
+    padding: '6px 10px', borderRadius: 6, border: '1px solid #475569',
+    background: 'transparent', color: '#94a3b8', fontSize: 12, cursor: 'pointer',
+  },
+  apiCloseBtn: {
+    padding: '4px 8px', borderRadius: 6, border: 'none',
+    background: 'transparent', color: '#94a3b8', fontSize: 14, cursor: 'pointer', marginLeft: 'auto',
+  },
+  errorConfigRow: {
+    display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap',
   },
   main: {
     flex: 1, overflow: 'hidden', padding: 16,
